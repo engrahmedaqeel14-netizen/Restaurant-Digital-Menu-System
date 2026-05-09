@@ -53,3 +53,8 @@ externalPort = 3003
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+GITHUB_REPOSITORY = "engrahmedaqeel14-netizen/Restaurant-Digital-Menu-System"

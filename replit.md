@@ -64,6 +64,13 @@ A cloud-based restaurant digital menu management system. Admins manage restauran
 - Orval zod config uses `mode: "single"` and absolute target path (no `workspace` option) to avoid regenerating `lib/api-zod/src/index.ts`. Do NOT add `workspace` or `schemas` back to the zod orval config — it causes duplicate exports.
 - `lib/api-zod/src/index.ts` is manually managed (only `export * from "./generated/api"`). Codegen does NOT overwrite it.
 
+## GitHub Sync
+
+- Every merge automatically pushes to `main` on GitHub via `scripts/post-merge.sh`
+- Target repo: `engrahmedaqeel14-netizen/Restaurant-Digital-Menu-System`
+- Requires two secrets/env vars: `GITHUB_TOKEN` (secret) and `GITHUB_REPOSITORY` (shared env var)
+- No manual push steps needed — sync is fully automatic after each task merge
+
 ## Pointers
 
 - See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
