@@ -29,20 +29,34 @@ append_backup_entry() {
 
 # ---------------------------------------------------------------------------
 # send_failure_notification <message>
-# Sends a Slack (or generic webhook) notification when the GitHub backup fails.
-# Requires SLACK_WEBHOOK_URL to be set; silently skips if it is not.
+# Sends failure notifications when the GitHub backup fails.
+#
+# Supported channels (set the corresponding env var to enable):
+#   SLACK_WEBHOOK_URL   — Slack incoming webhook URL
+#   DISCORD_WEBHOOK_URL — Discord channel webhook URL
+#
+# At least one must be set for any notification to fire; silently skips if
+# neither is set. Both fire independently when both are configured.
 # ---------------------------------------------------------------------------
 send_failure_notification() {
   local message="$1"
-  if [ -z "$SLACK_WEBHOOK_URL" ]; then
-    return 0
-  fi
   local repo_label="${GITHUB_REPOSITORY:-unknown repo}"
-  local payload
-  payload=$(printf '{"text":":warning: *GitHub backup failed* for `%s`\\n%s"}' "$repo_label" "$message")
-  curl -s -o /dev/null -X POST "$SLACK_WEBHOOK_URL" \
-    -H "Content-Type: application/json" \
-    -d "$payload" || true
+
+  if [ -n "$SLACK_WEBHOOK_URL" ]; then
+    local slack_payload
+    slack_payload=$(printf '{"text":":warning: *GitHub backup failed* for `%s`\\n%s"}' "$repo_label" "$message")
+    curl -s -o /dev/null -X POST "$SLACK_WEBHOOK_URL" \
+      -H "Content-Type: application/json" \
+      -d "$slack_payload" || true
+  fi
+
+  if [ -n "$DISCORD_WEBHOOK_URL" ]; then
+    local discord_payload
+    discord_payload=$(printf '{"content":":warning: **GitHub backup failed** for `%s`\\n%s"}' "$repo_label" "$message")
+    curl -s -o /dev/null -X POST "$DISCORD_WEBHOOK_URL" \
+      -H "Content-Type: application/json" \
+      -d "$discord_payload" || true
+  fi
 }
 
 if [ -z "$GITHUB_TOKEN" ] || [ -z "$GITHUB_REPOSITORY" ]; then

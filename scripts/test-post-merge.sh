@@ -33,7 +33,7 @@ exit 0
 EOF
 
   # curl: echo MOCK_CURL_STATUS when called with "-w %{http_code}" (GitHub API check);
-  # for POST requests (Slack webhook), log the body to the call log file.
+  # for POST requests (webhook calls), log the URL and body to the call log file.
   cat > "$dir/curl" << EOF
 #!/bin/bash
 call_log="$call_log"
@@ -52,11 +52,13 @@ for arg in "\$@"; do
     is_post=1
   elif [ "\$prev" = "-d" ]; then
     body="\$arg"
+  elif [[ "\$arg" == http* ]]; then
+    url="\$arg"
   fi
   prev="\$arg"
 done
 if [ "\$is_post" = "1" ]; then
-  echo "WEBHOOK_CALLED body=\$body" >> "\$call_log"
+  echo "WEBHOOK_CALLED url=\$url body=\$body" >> "\$call_log"
 fi
 exit 0
 EOF
@@ -107,7 +109,7 @@ assert_output_contains() {
 
 # ---------------------------------------------------------------------------
 # assert_webhook_called <test_name> <label> <expected_body_substring>
-# Checks that the Slack webhook was invoked and body contains the substring.
+# Checks that a webhook was invoked and the log line contains the substring.
 # ---------------------------------------------------------------------------
 assert_webhook_called() {
   local name="$1"
@@ -128,7 +130,7 @@ assert_webhook_called() {
 
 # ---------------------------------------------------------------------------
 # assert_webhook_not_called <test_name> <label>
-# Checks that the Slack webhook was NOT invoked.
+# Checks that no webhook was invoked at all.
 # ---------------------------------------------------------------------------
 assert_webhook_not_called() {
   local name="$1"
@@ -140,6 +142,69 @@ assert_webhook_not_called() {
   else
     echo "  FAIL: $name"
     echo "    Expected webhook NOT to be called, but it was:"
+    cat "$call_log" | sed 's/^/      /'
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# assert_slack_called <test_name> <label> <expected_body_substring>
+# Checks that the Slack webhook was invoked and body contains the substring.
+# Slack calls are identified by "slack" appearing in the logged URL.
+# ---------------------------------------------------------------------------
+assert_slack_called() {
+  local name="$1"
+  local label="$2"
+  local expected="$3"
+  local call_log="$WORK_DIR/webhook_calls_$label.log"
+  if grep "WEBHOOK_CALLED" "$call_log" | grep "slack" | grep -qF "$expected"; then
+    echo "  PASS: $name"
+    PASS=$((PASS + 1))
+  else
+    echo "  FAIL: $name"
+    echo "    Expected Slack webhook to be called with body containing: $expected"
+    echo "    Webhook call log:"
+    cat "$call_log" | sed 's/^/      /' || echo "      (empty)"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# assert_discord_called <test_name> <label> <expected_body_substring>
+# Checks that the Discord webhook was invoked and body contains the substring.
+# Discord calls are identified by "discord" appearing in the logged URL.
+# ---------------------------------------------------------------------------
+assert_discord_called() {
+  local name="$1"
+  local label="$2"
+  local expected="$3"
+  local call_log="$WORK_DIR/webhook_calls_$label.log"
+  if grep "WEBHOOK_CALLED" "$call_log" | grep "discord" | grep -qF "$expected"; then
+    echo "  PASS: $name"
+    PASS=$((PASS + 1))
+  else
+    echo "  FAIL: $name"
+    echo "    Expected Discord webhook to be called with body containing: $expected"
+    echo "    Webhook call log:"
+    cat "$call_log" | sed 's/^/      /' || echo "      (empty)"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# assert_discord_not_called <test_name> <label>
+# Checks that the Discord webhook was NOT invoked.
+# ---------------------------------------------------------------------------
+assert_discord_not_called() {
+  local name="$1"
+  local label="$2"
+  local call_log="$WORK_DIR/webhook_calls_$label.log"
+  if ! grep "WEBHOOK_CALLED" "$call_log" | grep -q "discord"; then
+    echo "  PASS: $name"
+    PASS=$((PASS + 1))
+  else
+    echo "  FAIL: $name"
+    echo "    Expected Discord webhook NOT to be called, but it was:"
     cat "$call_log" | sed 's/^/      /'
     FAIL=$((FAIL + 1))
   fi
@@ -317,6 +382,107 @@ out=$(run_script "$mock_bin" \
 assert_webhook_not_called \
   "no Slack alert on successful push" \
   "n5"
+
+# ---------------------------------------------------------------------------
+# Tests — Discord notification behaviour
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- Discord notification: 401 sends Discord alert with repo name and reason ---"
+mock_bin=$(make_mock_bin d1)
+out=$(run_script "$mock_bin" \
+  GITHUB_TOKEN="bad_token" \
+  GITHUB_REPOSITORY="owner/repo" \
+  DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/test" \
+  MOCK_CURL_STATUS="401")
+assert_discord_called \
+  "Discord alert sent on 401 with repo name" \
+  "d1" \
+  "owner/repo"
+assert_discord_called \
+  "Discord alert sent on 401 with failure reason" \
+  "d1" \
+  "invalid or expired"
+assert_discord_called \
+  "Discord alert sent on 401 uses Discord content format" \
+  "d1" \
+  '"content"'
+
+# ------------------------------------------------------------------
+echo ""
+echo "--- Discord notification: 403 sends Discord alert ---"
+mock_bin=$(make_mock_bin d2)
+out=$(run_script "$mock_bin" \
+  GITHUB_TOKEN="bad_token" \
+  GITHUB_REPOSITORY="owner/repo" \
+  DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/test" \
+  MOCK_CURL_STATUS="403")
+assert_discord_called \
+  "Discord alert sent on 403 with repo name" \
+  "d2" \
+  "owner/repo"
+assert_discord_called \
+  "Discord alert sent on 403 with failure reason" \
+  "d2" \
+  "403"
+
+# ------------------------------------------------------------------
+echo ""
+echo "--- Discord notification: failed git push sends Discord alert ---"
+mock_bin=$(make_mock_bin d3)
+out=$(run_script "$mock_bin" \
+  GITHUB_TOKEN="valid_token" \
+  GITHUB_REPOSITORY="owner/repo" \
+  DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/test" \
+  MOCK_CURL_STATUS="200" \
+  MOCK_GIT_EXIT="1")
+assert_discord_called \
+  "Discord alert sent on git push failure with repo name" \
+  "d3" \
+  "owner/repo"
+
+# ------------------------------------------------------------------
+echo ""
+echo "--- Discord notification: no alert when DISCORD_WEBHOOK_URL is unset ---"
+mock_bin=$(make_mock_bin d4)
+out=$(run_script "$mock_bin" \
+  GITHUB_TOKEN="bad_token" \
+  GITHUB_REPOSITORY="owner/repo" \
+  MOCK_CURL_STATUS="401")
+assert_discord_not_called \
+  "no Discord alert when DISCORD_WEBHOOK_URL is absent" \
+  "d4"
+
+# ------------------------------------------------------------------
+echo ""
+echo "--- Discord notification: no alert on successful push ---"
+mock_bin=$(make_mock_bin d5)
+out=$(run_script "$mock_bin" \
+  GITHUB_TOKEN="valid_token" \
+  GITHUB_REPOSITORY="owner/repo" \
+  DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/test" \
+  MOCK_CURL_STATUS="200")
+assert_discord_not_called \
+  "no Discord alert on successful push" \
+  "d5"
+
+# ------------------------------------------------------------------
+echo ""
+echo "--- Both channels: Slack AND Discord fire when both are configured ---"
+mock_bin=$(make_mock_bin d6)
+out=$(run_script "$mock_bin" \
+  GITHUB_TOKEN="bad_token" \
+  GITHUB_REPOSITORY="owner/repo" \
+  SLACK_WEBHOOK_URL="https://hooks.slack.example/test" \
+  DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/test" \
+  MOCK_CURL_STATUS="401")
+assert_slack_called \
+  "Slack alert fires independently when both channels are configured" \
+  "d6" \
+  "GitHub backup failed"
+assert_discord_called \
+  "Discord alert fires independently when both channels are configured" \
+  "d6" \
+  "GitHub backup failed"
 
 # ---------------------------------------------------------------------------
 echo ""
