@@ -44,16 +44,20 @@ export default function RestaurantDetail() {
 
   const { data: restaurant, isLoading } = useGetRestaurant(id, {
     query: {
+      queryKey: getGetRestaurantQueryKey(id),
       enabled: !!id,
     }
   });
 
-  const { data: menus, isLoading: menusLoading } = useListMenus({
-    query: {
-      queryKey: ["/api/menus", { restaurantId: id }] as any,
-      enabled: !!id,
+  const { data: menus, isLoading: menusLoading } = useListMenus(
+    { restaurantId: id },
+    {
+      query: {
+        queryKey: getListMenusQueryKey({ restaurantId: id }),
+        enabled: !!id,
+      }
     }
-  });
+  );
 
   const updateStatusMutation = useUpdateSubscriptionStatus({
     mutation: {

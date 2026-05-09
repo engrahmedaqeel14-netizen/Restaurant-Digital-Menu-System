@@ -7,13 +7,14 @@ import {
   LogOut, 
   ChefHat 
 } from "lucide-react";
-import { useGetAdminProfile, useAdminLogout } from "@workspace/api-client-react";
+import { useGetAdminProfile, useAdminLogout, getGetAdminProfileQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 
 export function Layout({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
   const { data: admin, isLoading, isError } = useGetAdminProfile({
     query: {
+      queryKey: getGetAdminProfileQueryKey(),
       retry: false,
     }
   });

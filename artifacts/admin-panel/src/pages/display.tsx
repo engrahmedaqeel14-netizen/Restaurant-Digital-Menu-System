@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRoute } from "wouter";
 import { format } from "date-fns";
-import { useGetDisplayMenu } from "@workspace/api-client-react";
+import { useGetDisplayMenu, getGetDisplayMenuQueryKey } from "@workspace/api-client-react";
 import { MonitorX, Loader2 } from "lucide-react";
 
 export default function Display() {
@@ -15,8 +15,9 @@ export default function Display() {
 
   const { data: menu, isLoading, isError, error } = useGetDisplayMenu(customerId, {
     query: {
+      queryKey: getGetDisplayMenuQueryKey(customerId),
       enabled: !!customerId && mounted,
-      refetchInterval: 10000, // Poll every 10 seconds
+      refetchInterval: 10000,
       retry: 3,
     }
   });

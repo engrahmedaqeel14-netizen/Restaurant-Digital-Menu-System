@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { ChefHat, Lock } from "lucide-react";
-import { useAdminLogin, useGetAdminProfile } from "@workspace/api-client-react";
+import { useAdminLogin, useGetAdminProfile, getGetAdminProfileQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ export default function Login() {
 
   const { data: profile } = useGetAdminProfile({
     query: {
+      queryKey: getGetAdminProfileQueryKey(),
       retry: false,
     }
   });
