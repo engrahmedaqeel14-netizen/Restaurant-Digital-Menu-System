@@ -16,10 +16,15 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 # Behaviour is controlled via env vars passed to run_script:
 #   MOCK_CURL_STATUS  — HTTP status code curl's "-w %{http_code}" returns (default 200)
 #   MOCK_GIT_EXIT     — exit code for git push (default 0)
+#
+# The mock curl logs every POST request body to $WORK_DIR/webhook_calls_<label>.log
+# so tests can assert whether the Slack webhook was invoked.
 # ---------------------------------------------------------------------------
 make_mock_bin() {
   local dir="$WORK_DIR/bin_$1"
+  local call_log="$WORK_DIR/webhook_calls_$1.log"
   mkdir -p "$dir"
+  touch "$call_log"
 
   # pnpm: always succeed silently (we're not testing the install/db steps)
   cat > "$dir/pnpm" << 'EOF'
@@ -27,17 +32,32 @@ make_mock_bin() {
 exit 0
 EOF
 
-  # curl: echo MOCK_CURL_STATUS when called with "-w %{http_code}", else succeed
-  cat > "$dir/curl" << 'EOF'
+  # curl: echo MOCK_CURL_STATUS when called with "-w %{http_code}" (GitHub API check);
+  # for POST requests (Slack webhook), log the body to the call log file.
+  cat > "$dir/curl" << EOF
 #!/bin/bash
+call_log="$call_log"
+is_post=0
+url=""
+body=""
 prev=""
-for arg in "$@"; do
-  if [ "$prev" = "-w" ] && [[ "$arg" == *"http_code"* ]]; then
-    printf '%s' "${MOCK_CURL_STATUS:-200}"
+for arg in "\$@"; do
+  if [ "\$prev" = "-w" ] && [[ "\$arg" == *"http_code"* ]]; then
+    printf '%s' "\${MOCK_CURL_STATUS:-200}"
     exit 0
   fi
-  prev="$arg"
+  if [ "\$arg" = "-X" ]; then
+    :
+  elif [ "\$prev" = "-X" ] && [ "\$arg" = "POST" ]; then
+    is_post=1
+  elif [ "\$prev" = "-d" ]; then
+    body="\$arg"
+  fi
+  prev="\$arg"
 done
+if [ "\$is_post" = "1" ]; then
+  echo "WEBHOOK_CALLED body=\$body" >> "\$call_log"
+fi
 exit 0
 EOF
 
@@ -86,7 +106,47 @@ assert_output_contains() {
 }
 
 # ---------------------------------------------------------------------------
-# Tests
+# assert_webhook_called <test_name> <label> <expected_body_substring>
+# Checks that the Slack webhook was invoked and body contains the substring.
+# ---------------------------------------------------------------------------
+assert_webhook_called() {
+  local name="$1"
+  local label="$2"
+  local expected="$3"
+  local call_log="$WORK_DIR/webhook_calls_$label.log"
+  if grep -qF "WEBHOOK_CALLED" "$call_log" && grep -qF "$expected" "$call_log"; then
+    echo "  PASS: $name"
+    PASS=$((PASS + 1))
+  else
+    echo "  FAIL: $name"
+    echo "    Expected webhook to be called with body containing: $expected"
+    echo "    Webhook call log:"
+    cat "$call_log" | sed 's/^/      /' || echo "      (empty)"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# assert_webhook_not_called <test_name> <label>
+# Checks that the Slack webhook was NOT invoked.
+# ---------------------------------------------------------------------------
+assert_webhook_not_called() {
+  local name="$1"
+  local label="$2"
+  local call_log="$WORK_DIR/webhook_calls_$label.log"
+  if ! grep -qF "WEBHOOK_CALLED" "$call_log"; then
+    echo "  PASS: $name"
+    PASS=$((PASS + 1))
+  else
+    echo "  FAIL: $name"
+    echo "    Expected webhook NOT to be called, but it was:"
+    cat "$call_log" | sed 's/^/      /'
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Tests — script logic
 # ---------------------------------------------------------------------------
 echo "=== post-merge.sh test suite ==="
 
@@ -175,6 +235,88 @@ assert_output_contains \
   "reports push failure without crashing" \
   "$out" \
   "git push to"
+
+# ---------------------------------------------------------------------------
+# Tests — Slack notification behaviour
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- Notification: 401 sends Slack alert with repo name and reason ---"
+mock_bin=$(make_mock_bin n1)
+out=$(run_script "$mock_bin" \
+  GITHUB_TOKEN="bad_token" \
+  GITHUB_REPOSITORY="owner/repo" \
+  SLACK_WEBHOOK_URL="https://hooks.slack.example/test" \
+  MOCK_CURL_STATUS="401")
+assert_webhook_called \
+  "Slack alert sent on 401 with repo name" \
+  "n1" \
+  "owner/repo"
+assert_webhook_called \
+  "Slack alert sent on 401 with failure reason" \
+  "n1" \
+  "invalid or expired"
+assert_webhook_called \
+  "Slack alert sent on 401 contains standard alert title" \
+  "n1" \
+  "GitHub backup failed"
+
+# ------------------------------------------------------------------
+echo ""
+echo "--- Notification: 403 sends Slack alert with repo name and reason ---"
+mock_bin=$(make_mock_bin n2)
+out=$(run_script "$mock_bin" \
+  GITHUB_TOKEN="bad_token" \
+  GITHUB_REPOSITORY="owner/repo" \
+  SLACK_WEBHOOK_URL="https://hooks.slack.example/test" \
+  MOCK_CURL_STATUS="403")
+assert_webhook_called \
+  "Slack alert sent on 403 with repo name" \
+  "n2" \
+  "owner/repo"
+assert_webhook_called \
+  "Slack alert sent on 403 with failure reason" \
+  "n2" \
+  "403"
+
+# ------------------------------------------------------------------
+echo ""
+echo "--- Notification: failed git push sends Slack alert ---"
+mock_bin=$(make_mock_bin n3)
+out=$(run_script "$mock_bin" \
+  GITHUB_TOKEN="valid_token" \
+  GITHUB_REPOSITORY="owner/repo" \
+  SLACK_WEBHOOK_URL="https://hooks.slack.example/test" \
+  MOCK_CURL_STATUS="200" \
+  MOCK_GIT_EXIT="1")
+assert_webhook_called \
+  "Slack alert sent on git push failure with repo name" \
+  "n3" \
+  "owner/repo"
+
+# ------------------------------------------------------------------
+echo ""
+echo "--- Notification: no alert when SLACK_WEBHOOK_URL is unset ---"
+mock_bin=$(make_mock_bin n4)
+out=$(run_script "$mock_bin" \
+  GITHUB_TOKEN="bad_token" \
+  GITHUB_REPOSITORY="owner/repo" \
+  MOCK_CURL_STATUS="401")
+assert_webhook_not_called \
+  "no Slack alert when SLACK_WEBHOOK_URL is absent" \
+  "n4"
+
+# ------------------------------------------------------------------
+echo ""
+echo "--- Notification: no alert on successful push ---"
+mock_bin=$(make_mock_bin n5)
+out=$(run_script "$mock_bin" \
+  GITHUB_TOKEN="valid_token" \
+  GITHUB_REPOSITORY="owner/repo" \
+  SLACK_WEBHOOK_URL="https://hooks.slack.example/test" \
+  MOCK_CURL_STATUS="200")
+assert_webhook_not_called \
+  "no Slack alert on successful push" \
+  "n5"
 
 # ---------------------------------------------------------------------------
 echo ""
