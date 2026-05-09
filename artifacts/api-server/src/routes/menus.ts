@@ -1,36 +1,8 @@
 import { Router } from "express";
-import multer from "multer";
-import path from "path";
-import fs from "fs";
 import { db, menusTable, restaurantsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "./auth";
 import { broadcastMenuUpdate } from "../lib/realtime";
-
-const uploadDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `menu-${unique}${path.extname(file.originalname)}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 20 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith("image/")) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only image files are allowed"));
-    }
-  },
-});
 
 const router = Router();
 
@@ -78,14 +50,14 @@ router.get("/menus", requireAuth, async (req, res): Promise<void> => {
   );
 });
 
-router.post("/menus/upload", requireAuth, upload.single("image"), async (req: any, res): Promise<void> => {
-  const { restaurantId, notes } = req.body;
+router.post("/menus/upload", requireAuth, async (req: any, res): Promise<void> => {
+  const { restaurantId, notes, objectPath } = req.body;
   if (!restaurantId) {
     res.status(400).json({ error: "restaurantId is required" });
     return;
   }
-  if (!req.file) {
-    res.status(400).json({ error: "Image file is required" });
+  if (!objectPath) {
+    res.status(400).json({ error: "objectPath is required" });
     return;
   }
   const rid = parseInt(String(restaurantId), 10);
@@ -95,7 +67,8 @@ router.post("/menus/upload", requireAuth, upload.single("image"), async (req: an
     return;
   }
 
-  const imageUrl = `/api/menus/images/${req.file.filename}`;
+  // Build the serving URL from the objectPath returned by the storage endpoint
+  const imageUrl = `/api/storage${objectPath}`;
 
   await db.update(menusTable).set({ isActive: false }).where(eq(menusTable.restaurantId, rid));
 
@@ -127,17 +100,6 @@ router.post("/menus/upload", requireAuth, upload.single("image"), async (req: an
     isActive: menu.isActive,
     uploadedAt: menu.uploadedAt.toISOString(),
   });
-});
-
-router.get("/menus/images/:filename", (req, res): void => {
-  const raw = Array.isArray(req.params.filename) ? req.params.filename[0] : req.params.filename;
-  const filename = path.basename(raw);
-  const filePath = path.join(uploadDir, filename);
-  if (!fs.existsSync(filePath)) {
-    res.status(404).json({ error: "Image not found" });
-    return;
-  }
-  res.sendFile(filePath);
 });
 
 router.get("/menus/:id", requireAuth, async (req, res): Promise<void> => {
@@ -180,8 +142,6 @@ router.delete("/menus/:id", requireAuth, async (req, res): Promise<void> => {
     res.status(404).json({ error: "Menu not found" });
     return;
   }
-  const filePath = path.join(uploadDir, path.basename(menu.imageUrl));
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   res.json({ success: true, message: "Menu deleted" });
 });
 

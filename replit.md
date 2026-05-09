@@ -32,7 +32,8 @@ A cloud-based restaurant digital menu management system. Admins manage restauran
 - `lib/api-client-react/src/generated/` — generated hooks (do not edit manually)
 - `artifacts/api-server/src/routes/` — Express routes (auth, restaurants, menus, display)
 - `artifacts/api-server/src/lib/realtime.ts` — WebSocket server + broadcastMenuUpdate
-- `artifacts/api-server/uploads/` — uploaded menu images (served at `/api/menus/images/:filename`)
+- `artifacts/api-server/src/lib/objectStorage.ts` — GCS object storage client (Replit sidecar auth)
+- `artifacts/api-server/src/routes/storage.ts` — presigned URL generation + object serving endpoints
 - `artifacts/admin-panel/src/pages/` — admin panel pages (login, dashboard, restaurants, menus, display)
 - `artifacts/menu-display/app/` — Expo screens (index, display/[customerId])
 
@@ -43,6 +44,7 @@ A cloud-based restaurant digital menu management system. Admins manage restauran
 - Menus table tracks version history; only one `isActive=true` per restaurant at a time; restaurants table caches `activeMenuId` + `activeMenuUrl` for fast display reads
 - Expo display app polls `/api/display/:customerId` every 10s as a fallback in addition to WebSocket for reliability
 - Admin panel uses wouter for routing with a base URL from `import.meta.env.BASE_URL`
+- Menu images are stored in Replit GCS-backed object storage (bucket: `replit-objstore-6622dc0d...`). Upload flow: (1) client POST `/api/storage/uploads/request-url` → gets presigned GCS PUT URL + objectPath, (2) client PUT directly to GCS URL, (3) client POST `/api/menus/upload` with JSON `{ restaurantId, objectPath, notes }` → server stores `imageUrl = /api/storage${objectPath}`
 
 ## Product
 
@@ -55,10 +57,12 @@ A cloud-based restaurant digital menu management system. Admins manage restauran
 
 ## Gotchas
 
-- Upload endpoint is `POST /api/menus/upload` (not `POST /api/menus`)
+- Upload endpoint is `POST /api/menus/upload` (JSON, not multipart/form-data). Requires `objectPath` from the presigned URL step first.
 - Cookie `SameSite=Lax` — works within same origin; CORS configured with `credentials: true`
 - After any schema change, run `pnpm --filter @workspace/db run push` before restarting the API
 - Always regenerate API client after editing `openapi.yaml`: `pnpm --filter @workspace/api-spec run codegen`
+- Orval zod config uses `mode: "single"` and absolute target path (no `workspace` option) to avoid regenerating `lib/api-zod/src/index.ts`. Do NOT add `workspace` or `schemas` back to the zod orval config — it causes duplicate exports.
+- `lib/api-zod/src/index.ts` is manually managed (only `export * from "./generated/api"`). Codegen does NOT overwrite it.
 
 ## Pointers
 

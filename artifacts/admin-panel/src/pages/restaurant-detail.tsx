@@ -83,22 +83,40 @@ export default function RestaurantDetail() {
     
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("image", file);
-      formData.append("restaurantId", id.toString());
-      if (uploadNotes) {
-        formData.append("notes", uploadNotes);
-      }
-
-      const res = await fetch(`/api/menus/upload`, {
+      // Step 1: Request a presigned GCS upload URL
+      const urlRes = await fetch('/api/storage/uploads/request-url', {
         method: 'POST',
         credentials: 'include',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          contentType: file.type || 'image/jpeg',
+        }),
       });
+      if (!urlRes.ok) throw new Error('Failed to get upload URL');
+      const { uploadURL, objectPath } = await urlRes.json();
 
-      if (!res.ok) {
-        throw new Error("Upload failed");
-      }
+      // Step 2: Upload the file directly to GCS via the presigned URL
+      const gcsRes = await fetch(uploadURL, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type || 'image/jpeg' },
+      });
+      if (!gcsRes.ok) throw new Error('Failed to upload to storage');
+
+      // Step 3: Register the uploaded menu with our API
+      const res = await fetch('/api/menus/upload', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurantId: id,
+          notes: uploadNotes || undefined,
+          objectPath,
+        }),
+      });
+      if (!res.ok) throw new Error('Upload registration failed');
 
       toast({ title: "Menu uploaded successfully" });
       setUploadNotes("");

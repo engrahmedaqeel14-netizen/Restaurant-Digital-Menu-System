@@ -188,11 +188,42 @@ export const ListMenusResponseItem = zod.object({
 export const ListMenusResponse = zod.array(ListMenusResponseItem);
 
 /**
- * @summary Upload a new menu image for a restaurant
+ * @summary Register an uploaded menu image for a restaurant
  */
 export const UploadMenuBody = zod.object({
   restaurantId: zod.number(),
   notes: zod.string().optional(),
+  objectPath: zod
+    .string()
+    .describe("Object path returned by \/storage\/uploads\/request-url"),
+});
+
+/**
+ * @summary Request a presigned URL for file upload
+ */
+export const RequestUploadUrlBody = zod.object({
+  name: zod.string(),
+  size: zod.number(),
+  contentType: zod.string(),
+});
+
+export const RequestUploadUrlResponse = zod.object({
+  uploadURL: zod.string(),
+  objectPath: zod.string(),
+  metadata: zod
+    .object({
+      name: zod.string(),
+      size: zod.number(),
+      contentType: zod.string(),
+    })
+    .optional(),
+});
+
+/**
+ * @summary Serve an uploaded object from GCS
+ */
+export const GetStorageObjectParams = zod.object({
+  objectPath: zod.coerce.string(),
 });
 
 /**

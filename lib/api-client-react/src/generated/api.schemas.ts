@@ -113,6 +113,20 @@ export interface Menu {
 export interface MenuUploadInput {
   restaurantId: number;
   notes?: string;
+  /** Object path returned by /storage/uploads/request-url */
+  objectPath: string;
+}
+
+export interface RequestUploadUrlBody {
+  name: string;
+  size: number;
+  contentType: string;
+}
+
+export interface RequestUploadUrlResponse {
+  uploadURL: string;
+  objectPath: string;
+  metadata?: RequestUploadUrlBody;
 }
 
 export interface DisplayMenu {

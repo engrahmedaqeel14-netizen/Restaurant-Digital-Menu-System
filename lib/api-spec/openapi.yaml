@@ -17,6 +17,8 @@ tags:
     description: Menu image management
   - name: display
     description: Customer-facing display endpoints
+  - name: Storage
+    description: Object storage upload and serving endpoints
 
 paths:
   /healthz:
@@ -250,11 +252,11 @@ paths:
     post:
       operationId: uploadMenu
       tags: [menus]
-      summary: Upload a new menu image for a restaurant
+      summary: Register an uploaded menu image for a restaurant
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
               $ref: "#/components/schemas/MenuUploadInput"
       responses:
@@ -264,6 +266,57 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Menu"
+
+  /storage/uploads/request-url:
+    post:
+      tags: [Storage]
+      operationId: requestUploadUrl
+      summary: Request a presigned URL for file upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestUploadUrlBody"
+      responses:
+        "200":
+          description: Presigned upload URL generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestUploadUrlResponse"
+        "400":
+          description: Missing or invalid required fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /storage/objects/{objectPath}:
+    get:
+      tags: [Storage]
+      operationId: getStorageObject
+      summary: Serve an uploaded object from GCS
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Object content
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Object not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /menus/{id}:
     get:
@@ -485,12 +538,37 @@ components:
 
     MenuUploadInput:
       type: object
-      required: [restaurantId]
+      required: [restaurantId, objectPath]
       properties:
         restaurantId:
           type: integer
         notes:
           type: string
+        objectPath:
+          type: string
+          description: Object path returned by /storage/uploads/request-url
+
+    RequestUploadUrlBody:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:
+          type: string
+        size:
+          type: integer
+        contentType:
+          type: string
+
+    RequestUploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+        objectPath:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/RequestUploadUrlBody"
 
     DisplayMenu:
       type: object
