@@ -10,4 +10,4 @@ if [ -z "$GITHUB_TOKEN" ] || [ -z "$GITHUB_REPOSITORY" ]; then
 fi
 
 git -c "http.extraHeader=Authorization: Basic $(echo -n "x-access-token:${GITHUB_TOKEN}" | base64 -w 0)" \
-  push "https://github.com/${GITHUB_REPOSITORY}.git" HEAD:main
+  push --force "https://github.com/${GITHUB_REPOSITORY}.git" HEAD:main
