@@ -129,6 +129,27 @@ export interface RequestUploadUrlResponse {
   metadata?: RequestUploadUrlBody;
 }
 
+/**
+ * Outcome of the backup attempt
+ */
+export type BackupEntryStatus =
+  (typeof BackupEntryStatus)[keyof typeof BackupEntryStatus];
+
+export const BackupEntryStatus = {
+  success: "success",
+  failure: "failure",
+  skipped: "skipped",
+} as const;
+
+export interface BackupEntry {
+  /** ISO 8601 UTC timestamp of the backup attempt */
+  timestamp: string;
+  /** Outcome of the backup attempt */
+  status: BackupEntryStatus;
+  /** Human-readable result message or error reason */
+  message: string;
+}
+
 export interface DisplayMenu {
   restaurantId: number;
   customerId: string;

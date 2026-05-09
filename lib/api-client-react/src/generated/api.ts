@@ -18,6 +18,7 @@ import type {
 
 import type {
   AdminUser,
+  BackupEntry,
   DisplayMenu,
   ErrorResponse,
   HealthStatus,
@@ -1459,6 +1460,82 @@ export const useDeleteMenu = <
 > => {
   return useMutation(getDeleteMenuMutationOptions(options));
 };
+
+/**
+ * Returns the last 50 GitHub backup attempts with timestamp, status, and message
+ * @summary Get GitHub backup history
+ */
+export const getGetBackupHistoryUrl = () => {
+  return `/api/admin/backup-history`;
+};
+
+export const getBackupHistory = async (
+  options?: RequestInit,
+): Promise<BackupEntry[]> => {
+  return customFetch<BackupEntry[]>(getGetBackupHistoryUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetBackupHistoryQueryKey = () => {
+  return [`/api/admin/backup-history`] as const;
+};
+
+export const getGetBackupHistoryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBackupHistory>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getBackupHistory>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetBackupHistoryQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getBackupHistory>>
+  > = ({ signal }) => getBackupHistory({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBackupHistory>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBackupHistoryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBackupHistory>>
+>;
+export type GetBackupHistoryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get GitHub backup history
+ */
+
+export function useGetBackupHistory<
+  TData = Awaited<ReturnType<typeof getBackupHistory>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getBackupHistory>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBackupHistoryQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get the active menu for a restaurant display screen (by customer ID)

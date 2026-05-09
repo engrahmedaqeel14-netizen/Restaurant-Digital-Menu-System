@@ -257,6 +257,23 @@ export const DeleteMenuResponse = zod.object({
 });
 
 /**
+ * Returns the last 50 GitHub backup attempts with timestamp, status, and message
+ * @summary Get GitHub backup history
+ */
+export const GetBackupHistoryResponseItem = zod.object({
+  timestamp: zod
+    .string()
+    .describe("ISO 8601 UTC timestamp of the backup attempt"),
+  status: zod
+    .enum(["success", "failure", "skipped"])
+    .describe("Outcome of the backup attempt"),
+  message: zod
+    .string()
+    .describe("Human-readable result message or error reason"),
+});
+export const GetBackupHistoryResponse = zod.array(GetBackupHistoryResponseItem);
+
+/**
  * @summary Get the active menu for a restaurant display screen (by customer ID)
  */
 export const GetDisplayMenuParams = zod.object({

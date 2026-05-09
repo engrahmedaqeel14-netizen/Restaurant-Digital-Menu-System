@@ -1,9 +1,10 @@
 import { Link, useLocation } from "wouter";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import {
   useGetRestaurantStats,
   useListMenus,
   useListRestaurants,
+  useGetBackupHistory,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,15 +17,32 @@ import {
   Plus,
   ArrowRight,
   MonitorPlay,
-  TrendingUp,
   XCircle,
+  Github,
+  Clock,
+  SkipForward,
 } from "lucide-react";
+
+function BackupStatusIcon({ status }: { status: string }) {
+  if (status === "success") return <CheckCircle className="w-4 h-4 text-emerald-500" />;
+  if (status === "failure") return <XCircle className="w-4 h-4 text-red-500" />;
+  return <SkipForward className="w-4 h-4 text-amber-500" />;
+}
+
+function backupStatusBadge(status: string) {
+  if (status === "success")
+    return <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-xs">Success</Badge>;
+  if (status === "failure")
+    return <Badge variant="secondary" className="bg-red-500/10 text-red-600 border-red-500/20 text-xs">Failed</Badge>;
+  return <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-xs">Skipped</Badge>;
+}
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { data: stats, isLoading: statsLoading } = useGetRestaurantStats();
   const { data: recentMenus, isLoading: menusLoading } = useListMenus();
   const { data: restaurants, isLoading: restaurantsLoading } = useListRestaurants();
+  const { data: backupHistory, isLoading: backupLoading } = useGetBackupHistory();
 
   const statCards = [
     {
@@ -123,6 +141,54 @@ export default function Dashboard() {
           </Card>
         ))}
       </div>
+
+      {/* GitHub Backup History */}
+      <Card className="hover-elevate">
+        <CardHeader className="flex flex-row items-center justify-between border-b border-border pb-4">
+          <div className="flex items-center gap-2">
+            <Github className="w-4 h-4 text-muted-foreground" />
+            <CardTitle className="text-base font-semibold">GitHub Backup History</CardTitle>
+          </div>
+          {backupHistory && backupHistory.length > 0 && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Clock className="w-3.5 h-3.5" />
+              Last: {formatDistanceToNow(new Date(backupHistory[0].timestamp), { addSuffix: true })}
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="pt-4">
+          {backupLoading ? (
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-10 bg-muted animate-pulse rounded-lg" />
+              ))}
+            </div>
+          ) : backupHistory && backupHistory.length > 0 ? (
+            <div className="space-y-2">
+              {backupHistory.slice(0, 10).map((entry, i) => (
+                <div key={i} className="flex items-start gap-3 p-2.5 rounded-lg border border-border bg-card/50">
+                  <BackupStatusIcon status={entry.status} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground truncate" title={entry.message}>
+                      {entry.message}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                      {format(new Date(entry.timestamp), "MMM d, yyyy h:mm a")}
+                    </p>
+                  </div>
+                  {backupStatusBadge(entry.status)}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <Github className="h-8 w-8 text-muted-foreground/30 mb-2" />
+              <p className="text-sm text-muted-foreground">No backup history yet</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">History appears here after the first GitHub sync</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
