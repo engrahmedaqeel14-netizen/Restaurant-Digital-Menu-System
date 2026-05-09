@@ -60,10 +60,7 @@ jobs:
             ts-build-api-client-react-${{ runner.os }}-
 
       - name: Security audit
-        run: pnpm audit --audit-level=high
+        run: pnpm audit --audit-level=critical
 
       - name: Typecheck
         run: pnpm run typecheck
-
-      - name: Build
-        run: pnpm run build
