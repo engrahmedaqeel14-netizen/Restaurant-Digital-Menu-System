@@ -1,15 +1,23 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Cloud-Based Restaurant Digital Menu Management System API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Admin authentication
+  - name: restaurants
+    description: Restaurant management
+  - name: menus
+    description: Menu image management
+  - name: display
+    description: Customer-facing display endpoints
+
 paths:
   /healthz:
     get:
@@ -24,6 +32,306 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: adminLogin
+      tags: [auth]
+      summary: Admin login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: adminLogout
+      tags: [auth]
+      summary: Admin logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getAdminProfile
+      tags: [auth]
+      summary: Get current admin profile
+      responses:
+        "200":
+          description: Admin profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /restaurants:
+    get:
+      operationId: listRestaurants
+      tags: [restaurants]
+      summary: List all restaurants
+      responses:
+        "200":
+          description: List of restaurants
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Restaurant"
+    post:
+      operationId: createRestaurant
+      tags: [restaurants]
+      summary: Create a new restaurant subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestaurantInput"
+      responses:
+        "201":
+          description: Restaurant created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Restaurant"
+
+  /restaurants/stats:
+    get:
+      operationId: getRestaurantStats
+      tags: [restaurants]
+      summary: Get dashboard stats
+      responses:
+        "200":
+          description: Stats summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RestaurantStats"
+
+  /restaurants/{id}:
+    get:
+      operationId: getRestaurant
+      tags: [restaurants]
+      summary: Get a restaurant by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Restaurant details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Restaurant"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateRestaurant
+      tags: [restaurants]
+      summary: Update a restaurant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestaurantUpdate"
+      responses:
+        "200":
+          description: Restaurant updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Restaurant"
+    delete:
+      operationId: deleteRestaurant
+      tags: [restaurants]
+      summary: Delete a restaurant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /restaurants/{id}/subscription:
+    patch:
+      operationId: updateSubscriptionStatus
+      tags: [restaurants]
+      summary: Activate or deactivate restaurant subscription
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscriptionUpdate"
+      responses:
+        "200":
+          description: Subscription updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Restaurant"
+
+  /menus:
+    get:
+      operationId: listMenus
+      tags: [menus]
+      summary: List all menus (optionally filtered by restaurant)
+      parameters:
+        - name: restaurantId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of menus
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Menu"
+
+  /menus/upload:
+    post:
+      operationId: uploadMenu
+      tags: [menus]
+      summary: Upload a new menu image for a restaurant
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/MenuUploadInput"
+      responses:
+        "201":
+          description: Menu uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Menu"
+
+  /menus/{id}:
+    get:
+      operationId: getMenu
+      tags: [menus]
+      summary: Get a menu by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Menu
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Menu"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteMenu
+      tags: [menus]
+      summary: Delete a menu
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /display/{customerId}:
+    get:
+      operationId: getDisplayMenu
+      tags: [display]
+      summary: Get the active menu for a restaurant display screen (by customer ID)
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Active menu for display
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DisplayMenu"
+        "404":
+          description: No active menu found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +342,167 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+        - success
+
+    LoginInput:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    LoginResponse:
+      type: object
+      required: [success, admin]
+      properties:
+        success:
+          type: boolean
+        admin:
+          $ref: "#/components/schemas/AdminUser"
+
+    AdminUser:
+      type: object
+      required: [id, username]
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+
+    Restaurant:
+      type: object
+      required: [id, customerId, name, subscriptionStatus, createdAt]
+      properties:
+        id:
+          type: integer
+        customerId:
+          type: string
+          description: Unique customer ID like REST001
+        name:
+          type: string
+        contactEmail:
+          type: ["string", "null"]
+        contactPhone:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        subscriptionStatus:
+          type: string
+          enum: [active, inactive, suspended]
+        activeMenuId:
+          type: ["integer", "null"]
+        activeMenuUrl:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    RestaurantInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        contactEmail:
+          type: string
+        contactPhone:
+          type: string
+        address:
+          type: string
+
+    RestaurantUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        contactEmail:
+          type: string
+        contactPhone:
+          type: string
+        address:
+          type: string
+
+    SubscriptionUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+
+    RestaurantStats:
+      type: object
+      required: [total, active, inactive, suspended, recentUploads]
+      properties:
+        total:
+          type: integer
+        active:
+          type: integer
+        inactive:
+          type: integer
+        suspended:
+          type: integer
+        recentUploads:
+          type: integer
+
+    Menu:
+      type: object
+      required: [id, restaurantId, imageUrl, isActive, uploadedAt]
+      properties:
+        id:
+          type: integer
+        restaurantId:
+          type: integer
+        restaurantName:
+          type: ["string", "null"]
+        restaurantCustomerId:
+          type: ["string", "null"]
+        imageUrl:
+          type: string
+        notes:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        uploadedAt:
+          type: string
+
+    MenuUploadInput:
+      type: object
+      required: [restaurantId]
+      properties:
+        restaurantId:
+          type: integer
+        notes:
+          type: string
+
+    DisplayMenu:
+      type: object
+      required: [restaurantId, customerId, restaurantName, imageUrl, updatedAt]
+      properties:
+        restaurantId:
+          type: integer
+        customerId:
+          type: string
+        restaurantName:
+          type: string
+        imageUrl:
+          type: string
+        updatedAt:
+          type: string

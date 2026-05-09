@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/menu-display/"
+title = "Restaurant Menu Display"
+version = "1.0.0"
+id = "artifacts/menu-display"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/menu-display/" ]
+localPort = 23651
+
+[services.development]
+run = "pnpm --filter @workspace/menu-display run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/menu-display", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/menu-display", "run", "serve" ]
+
+[services.env]
+PORT = "23651"
+BASE_PATH = "/menu-display/"
