@@ -29,6 +29,36 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Restore TS build — lib/db
+        uses: actions/cache@v4
+        with:
+          path: |
+            lib/db/dist
+            lib/db/tsconfig.tsbuildinfo
+          key: ts-build-db-${{ runner.os }}-${{ hashFiles('lib/db/src/**', 'lib/db/tsconfig.json', 'tsconfig.base.json', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ts-build-db-${{ runner.os }}-
+
+      - name: Restore TS build — lib/api-zod
+        uses: actions/cache@v4
+        with:
+          path: |
+            lib/api-zod/dist
+            lib/api-zod/tsconfig.tsbuildinfo
+          key: ts-build-api-zod-${{ runner.os }}-${{ hashFiles('lib/api-zod/src/**', 'lib/api-zod/tsconfig.json', 'tsconfig.base.json', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ts-build-api-zod-${{ runner.os }}-
+
+      - name: Restore TS build — lib/api-client-react
+        uses: actions/cache@v4
+        with:
+          path: |
+            lib/api-client-react/dist
+            lib/api-client-react/tsconfig.tsbuildinfo
+          key: ts-build-api-client-react-${{ runner.os }}-${{ hashFiles('lib/api-client-react/src/**', 'lib/api-client-react/tsconfig.json', 'tsconfig.base.json', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ts-build-api-client-react-${{ runner.os }}-
+
       - name: Security audit
         run: pnpm audit --audit-level=high
 
