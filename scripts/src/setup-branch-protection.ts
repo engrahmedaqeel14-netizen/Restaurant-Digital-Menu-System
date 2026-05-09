@@ -1,14 +1,14 @@
 /**
  * setup-branch-protection.ts
  *
- * Configures a GitHub branch protection rule on `main` that requires the
- * "Typecheck & Build" CI status check to pass before any pull request can
- * be merged.
+ * Configures a GitHub branch protection rule on `main` that:
+ *   - Requires the "Typecheck & Build" CI status check to pass before merging.
+ *   - Requires at least 1 approving pull request review before merging.
+ *   - Dismisses stale approvals when new commits are pushed to the PR branch.
  *
  * The script fetches any existing branch-protection settings first and
- * merges in the required status check, so it will NOT accidentally remove
- * other protections (e.g. required reviewers, admin enforcement) that are
- * already in place.
+ * merges in the required settings, so it will NOT accidentally remove
+ * other protections that are already in place.
  *
  * ─── Prerequisites ────────────────────────────────────────────────────────────
  * Set two environment variables before running:
@@ -28,7 +28,10 @@
  *   4. Check "Require status checks to pass before merging".
  *   5. In the search box, type and select: Typecheck & Build
  *   6. Check "Require branches to be up to date before merging" (recommended).
- *   7. Click "Create" (or "Save changes").
+ *   7. Check "Require a pull request before merging".
+ *   8. Set "Required approvals" to 1.
+ *   9. Check "Dismiss stale pull request approvals when new commits are pushed".
+ *  10. Click "Create" (or "Save changes").
  */
 
 const BRANCH = "main";
@@ -117,21 +120,22 @@ function buildPutBody(existing: ExistingProtection | null): Record<string, unkno
     : [...existingChecks, { context: REQUIRED_CHECK }];
 
   const existingReviews = existing?.required_pull_request_reviews;
-  let reviews: Record<string, unknown> | null = null;
-  if (existingReviews) {
-    reviews = {
-      dismiss_stale_reviews: existingReviews.dismiss_stale_reviews ?? false,
-      require_code_owner_reviews: existingReviews.require_code_owner_reviews ?? false,
-      required_approving_review_count:
-        existingReviews.required_approving_review_count ?? 0,
-      require_last_push_approval: existingReviews.require_last_push_approval ?? false,
+  const reviews: Record<string, unknown> = {
+    // Always require at least 1 approving review
+    required_approving_review_count: Math.max(
+      existingReviews?.required_approving_review_count ?? 0,
+      1
+    ),
+    // Always dismiss stale approvals when new commits are pushed
+    dismiss_stale_reviews: true,
+    require_code_owner_reviews: existingReviews?.require_code_owner_reviews ?? false,
+    require_last_push_approval: existingReviews?.require_last_push_approval ?? false,
+  };
+  if (existingReviews?.dismissal_restrictions) {
+    reviews.dismissal_restrictions = {
+      users: existingReviews.dismissal_restrictions.users?.map((u) => u.login) ?? [],
+      teams: existingReviews.dismissal_restrictions.teams?.map((t) => t.slug) ?? [],
     };
-    if (existingReviews.dismissal_restrictions) {
-      reviews.dismissal_restrictions = {
-        users: existingReviews.dismissal_restrictions.users?.map((u) => u.login) ?? [],
-        teams: existingReviews.dismissal_restrictions.teams?.map((t) => t.slug) ?? [],
-      };
-    }
   }
 
   const existingRestrictions = existing?.restrictions;
@@ -194,8 +198,10 @@ async function applyBranchProtection(): Promise<void> {
 
     console.log("Branch protection updated successfully.");
     console.log(`  Required checks now: ${finalChecks}`);
+    console.log(`  Required approving reviews: 1`);
+    console.log(`  Dismiss stale reviews on new commits: yes`);
     console.log(
-      `  PRs targeting '${BRANCH}' must pass all listed checks before merging.`
+      `  PRs targeting '${BRANCH}' must pass all listed checks and have at least 1 approval before merging.`
     );
     return;
   }
