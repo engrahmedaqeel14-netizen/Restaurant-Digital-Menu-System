@@ -15,13 +15,15 @@ import {
   MonitorPlay, 
   UploadCloud, 
   Image as ImageIcon,
-  Clock,
   Trash2,
   ExternalLink,
   ShieldAlert,
   CheckCircle,
   XCircle,
-  Loader2
+  Loader2,
+  Copy,
+  Check,
+  Link2
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -41,6 +43,7 @@ export default function RestaurantDetail() {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadNotes, setUploadNotes] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const { data: restaurant, isLoading } = useGetRestaurant(id, {
     query: {
@@ -132,6 +135,17 @@ export default function RestaurantDetail() {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const previewUrl = restaurant
+    ? `${window.location.origin}${import.meta.env.BASE_URL}display/${restaurant.customerId}`
+    : "";
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(previewUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -233,6 +247,40 @@ export default function RestaurantDetail() {
                     <XCircle className="w-4 h-4 mr-1.5" /> Deactivate
                   </Button>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Customer Preview Link */}
+          <Card className="hover-elevate shadow-sm">
+            <CardHeader className="border-b border-border pb-4">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Link2 className="w-4 h-4 text-primary" /> Customer Preview Link
+              </CardTitle>
+              <CardDescription>Share this link with customers to view the live menu</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-3">
+              <div className="flex items-center gap-2 bg-muted/60 border border-border rounded-lg px-3 py-2">
+                <span className="text-xs font-mono text-muted-foreground truncate flex-1 select-all" title={previewUrl}>
+                  {previewUrl}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 gap-2"
+                  onClick={handleCopyLink}
+                >
+                  {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                  {copied ? "Copied!" : "Copy Link"}
+                </Button>
+                <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="flex-1">
+                  <Button variant="outline" size="sm" className="w-full gap-2">
+                    <ExternalLink className="w-4 h-4" />
+                    Open Preview
+                  </Button>
+                </a>
               </div>
             </CardContent>
           </Card>

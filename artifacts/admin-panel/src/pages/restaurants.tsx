@@ -12,7 +12,8 @@ import {
   MoreHorizontal,
   Edit,
   Trash2,
-  ExternalLink
+  ExternalLink,
+  MonitorPlay
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -136,7 +137,7 @@ export default function Restaurants() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-4 w-full sm:w-auto shrink-0">
+                  <div className="flex items-center gap-3 w-full sm:w-auto shrink-0">
                     <div className="h-16 w-24 bg-muted rounded border border-border overflow-hidden shrink-0 flex items-center justify-center text-muted-foreground text-xs shadow-sm">
                       {restaurant.activeMenuUrl ? (
                         <img src={restaurant.activeMenuUrl} alt="Active Menu" className="w-full h-full object-cover" />
@@ -144,6 +145,18 @@ export default function Restaurants() {
                         <span>No Menu</span>
                       )}
                     </div>
+
+                    <a
+                      href={`${import.meta.env.BASE_URL}display/${restaurant.customerId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open customer preview"
+                    >
+                      <Button variant="outline" size="sm" className="gap-1.5 hidden sm:flex">
+                        <MonitorPlay className="w-4 h-4" />
+                        Preview
+                      </Button>
+                    </a>
                     
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
