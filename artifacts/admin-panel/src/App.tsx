@@ -21,6 +21,8 @@ function Router() {
     <Switch>
       <Route path="/display/:customerId" component={Display} />
       <Route path="/menuboard" component={MenuBoard} />
+      <Route path="/menu-display" component={MenuBoard} />
+      <Route path="/menu-display/:rest*" component={MenuBoard} />
       <Route path="/login" component={Login} />
       <Route path="*">
         <Layout>
