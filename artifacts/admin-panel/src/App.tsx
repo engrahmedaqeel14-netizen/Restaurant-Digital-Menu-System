@@ -11,6 +11,7 @@ import RestaurantNew from "@/pages/restaurant-new";
 import RestaurantDetail from "@/pages/restaurant-detail";
 import Menus from "@/pages/menus";
 import Display from "@/pages/display";
+import MenuBoard from "@/pages/menuboard";
 import { Layout } from "@/components/layout";
 
 const queryClient = new QueryClient();
@@ -19,6 +20,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/display/:customerId" component={Display} />
+      <Route path="/menuboard" component={MenuBoard} />
       <Route path="/login" component={Login} />
       <Route path="*">
         <Layout>
